@@ -15,6 +15,15 @@ on:
     # 晚间任务：北京时间每天 22:00（UTC 14:00）
     #- cron: '0 14 * * *'
   workflow_dispatch:  # 手动触发
+    inputs:
+      check_login:
+        description: '仅检查登录，不执行阅读或推送'
+        type: boolean
+        default: false
+      smoke_test:
+        description: '仅运行两次阅读验证，不推送通知'
+        type: boolean
+        default: false
 
 jobs:
   deploy:
@@ -53,7 +62,13 @@ jobs:
         READ_NUM: ${{ vars.READ_NUM }}  # 使用 Repository Variables
 
       run: |
-        python main.py
+        if [ "${{ inputs.check_login }}" = "true" ]; then
+          python main.py --check-login
+        elif [ "${{ inputs.smoke_test }}" = "true" ]; then
+          READ_NUM=2 PUSH_METHOD="" python main.py
+        else
+          python main.py
+        fi
 
   keepalive-job:
     name: Keepalive Workflow

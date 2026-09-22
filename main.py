@@ -1,5 +1,6 @@
 # main.py 主逻辑：包括字段拼接、模拟请求
 import json
+import sys
 import time
 import random
 import logging
@@ -47,9 +48,17 @@ def get_wr_skey():
             if 'wr_skey' in response.cookies:
                 return response.cookies['wr_skey'][:8]
             else:
+                # Only log status codes; response bodies and cookies may contain credentials.
+                try:
+                    result = response.json()
+                except ValueError:
+                    result = None
+                code = result.get('errcode') if isinstance(result, dict) else None
+                logging.warning("刷新未返回密钥：HTTP %s，errcode=%s", response.status_code,
+                                code if type(code) is int else 'unknown')
                 continue
         except requests.RequestException as exc:
-            logging.warning(f"refresh_cookie 请求失败，payload={cookie_data}，原因：{exc}")
+            logging.warning("刷新请求失败：%s", type(exc).__name__)
             continue
         
         
@@ -65,15 +74,18 @@ def refresh_cookie():
     new_skey = get_wr_skey()
     if new_skey:
         cookies['wr_skey'] = new_skey
-        logging.info(f"密钥刷新成功，新密钥：{new_skey[:2]}***")
+        logging.info("密钥刷新成功")
         logging.info("重新本次阅读。")
     else:
-        ERROR_CODE = "无法获取新密钥或者 WXREAD_CURL_BASH 配置有误，终止运行。"
+        ERROR_CODE = "无法获取新密钥，终止运行；请查看上方 HTTP/errcode 或网络异常日志，不能仅凭此错误判断配置失效。"
         logging.error(ERROR_CODE)
-        push(ERROR_CODE, PUSH_METHOD, is_success=False)
+        if '--check-login' not in sys.argv:
+            push(ERROR_CODE, PUSH_METHOD, is_success=False)
         raise Exception(ERROR_CODE)
 
 refresh_cookie()
+if '--check-login' in sys.argv:
+    raise SystemExit(0)
 index = 1
 lastTime = int(time.time()) - 30
 logging.info(f"一共需要阅读 {READ_NUM} 次。")
