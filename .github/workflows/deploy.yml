@@ -20,6 +20,10 @@ on:
         description: '仅检查登录，不执行阅读或推送'
         type: boolean
         default: false
+      smoke_test:
+        description: '仅运行两次阅读验证，不推送通知'
+        type: boolean
+        default: false
 
 jobs:
   deploy:
@@ -60,6 +64,8 @@ jobs:
       run: |
         if [ "${{ inputs.check_login }}" = "true" ]; then
           python main.py --check-login
+        elif [ "${{ inputs.smoke_test }}" = "true" ]; then
+          READ_NUM=2 PUSH_METHOD="" python main.py
         else
           python main.py
         fi
