@@ -52,6 +52,15 @@
 
 **重要：除了READ_NUM配置在varables，其它的都配置在secrets里面的；需要推送`PUSH_METHOD`是必填的。**
 
+### 登录故障检查
+
+在 Actions 手动运行中勾选 `check_login`，仅刷新登录，不阅读或推送；也可本地执行
+`python main.py --check-login`。失败日志只记录 HTTP 状态、数字 errcode 或网络异常类型，
+不输出响应正文或密钥。没有返回新密钥不一定代表配置错误，需结合诊断信息排查。
+
+勾选 `smoke_test` 可运行两次阅读请求（约一分钟），不推送；两项同时勾选时只检查登录。
+定时运行仍使用原有阅读次数及推送配置。离线回归检查：`python test_login.py`。
+
 ### 视频教程
 
 [![视频教程](https://github.com/user-attachments/assets/ec144869-3dbb-40fe-9bc5-f8bf1b5fce3c)](https://www.bilibili.com/video/BV1kJ6gY3En3/ "点击查看视频")
