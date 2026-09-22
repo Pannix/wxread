@@ -77,7 +77,7 @@ def refresh_cookie():
         logging.info("密钥刷新成功")
         logging.info("重新本次阅读。")
     else:
-        ERROR_CODE = "无法获取新密钥或者 WXREAD_CURL_BASH 配置有误，终止运行。"
+        ERROR_CODE = "无法获取新密钥，终止运行；请查看上方 HTTP/errcode 或网络异常日志，不能仅凭此错误判断配置失效。"
         logging.error(ERROR_CODE)
         if '--check-login' not in sys.argv:
             push(ERROR_CODE, PUSH_METHOD, is_success=False)
