@@ -82,4 +82,4 @@ if __name__ == '__main__':
     assert 'errcode=-2012' in check([failure] * 3, False)
     check_read_fallback(True)
     check_read_fallback(False)
-    print('PASS: login success, fallback, rejection, non-JSON and network failure; no reading, push or credential logs')
+    print('PASS: login and reading fallback regressions; no real network or credentials')
