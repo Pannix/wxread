@@ -53,7 +53,7 @@ def get_wr_skey():
                     result = response.json()
                 except ValueError:
                     result = None
-                code = result.get('errcode') if isinstance(result, dict) else None
+                code = result.get('errCode', result.get('errcode')) if isinstance(result, dict) else None
                 logging.warning("刷新未返回密钥：HTTP %s，errcode=%s", response.status_code,
                                 code if type(code) is int else 'unknown')
                 continue
@@ -69,21 +69,25 @@ def fix_no_synckey():
 
 refresh_print = setup_logging()
 
-def refresh_cookie():
+def refresh_cookie(strict=True):
     logging.info("刷新 cookie")
     new_skey = get_wr_skey()
     if new_skey:
         cookies['wr_skey'] = new_skey
         logging.info("密钥刷新成功")
         logging.info("重新本次阅读。")
+        return True
     else:
+        if not strict:
+            logging.warning("启动刷新未返回新密钥，保留现有会话验证阅读；不代表登录成功。")
+            return False
         ERROR_CODE = "无法获取新密钥，终止运行；请查看上方 HTTP/errcode 或网络异常日志，不能仅凭此错误判断配置失效。"
         logging.error(ERROR_CODE)
         if '--check-login' not in sys.argv:
             push(ERROR_CODE, PUSH_METHOD, is_success=False)
         raise Exception(ERROR_CODE)
 
-refresh_cookie()
+refresh_cookie(strict='--check-login' in sys.argv)
 if '--check-login' in sys.argv:
     raise SystemExit(0)
 index = 1
@@ -104,7 +108,7 @@ while index <= READ_NUM:
 
     refresh_print(f"阅读进度: 第 {index}/{READ_NUM} 次，已完成 {(index - 1) * 0.5:.1f} 分钟")
     logging.debug("data: %s", data)
-    response = requests.post(READ_URL, headers=headers, cookies=cookies, data=json.dumps(data, separators=(',', ':')))
+    response = requests.post(READ_URL, headers=headers, cookies=cookies, data=json.dumps(data, separators=(',', ':')), timeout=(10, 30))
     resData = response.json()
     logging.debug("response: %s", resData)
 
@@ -118,7 +122,9 @@ while index <= READ_NUM:
             logging.warning("无 synckey，尝试修复...")
             fix_no_synckey()
     else:
-        logging.warning("cookie 已过期，尝试刷新...")
+        code = resData.get('errCode', resData.get('errcode')) if isinstance(resData, dict) else None
+        logging.warning("阅读未成功：HTTP %s，errcode=%s；尝试刷新会话。",
+                        response.status_code, code if type(code) is int else 'unknown')
         refresh_cookie()
 
 logging.info("阅读脚本已完成。")

@@ -41,6 +41,31 @@ def check(responses, succeeds):
     return output.getvalue()
 
 
+def check_read_fallback(succeeds):
+    """An unsuccessful renewal must not discard a still-working reading session."""
+    config = SimpleNamespace(data={'s': 'signature'}, headers={}, cookies={}, READ_NUM=2,
+                             PUSH_METHOD='', book=['book'], chapter=['chapter'])
+    renewal = Mock(cookies={}, status_code=200)
+    renewal.json.return_value = {'errCode': -2012, 'message': 'private-value'}
+    reading = Mock(status_code=200)
+    reading.json.return_value = ({'succ': 1, 'synckey': 'private-value'} if succeeds
+                                else {'errCode': -2012, 'message': 'private-value'})
+    replies = [renewal] * 3 + ([reading] * 2 if succeeds else [reading] + [renewal] * 3)
+    with patch.dict(sys.modules, {
+        'config': config, 'push': SimpleNamespace(push=Mock()),
+        'log_utils': SimpleNamespace(setup_logging=lambda: lambda *args: None),
+    }), patch.object(sys, 'argv', ['main.py']), \
+            patch.object(requests, 'post', side_effect=replies) as post, \
+            patch('time.sleep'):
+        try:
+            runpy.run_path(str(Path(__file__).with_name('main.py')))
+            assert succeeds
+        except Exception as exc:
+            assert not succeeds and '无法获取新密钥' in str(exc)
+        assert post.call_count == len(replies)
+        assert sum(call.args[0].endswith('/book/read') for call in post.call_args_list) == (2 if succeeds else 1)
+
+
 if __name__ == '__main__':
     success = Mock(cookies={'wr_skey': 'private-value'}, status_code=200)
     failure = Mock(cookies={}, status_code=200)
@@ -52,4 +77,9 @@ if __name__ == '__main__':
     assert 'errcode=unknown' in check([failure] * 3, False)
     assert 'ConnectionError' in check(
         [requests.ConnectionError('private-value')] * 3, False)
-    print('PASS: login success, fallback, rejection, non-JSON and network failure; no reading, push or credential logs')
+    failure.json.side_effect = None
+    failure.json.return_value = {'errCode': -2012, 'message': 'private-value'}
+    assert 'errcode=-2012' in check([failure] * 3, False)
+    check_read_fallback(True)
+    check_read_fallback(False)
+    print('PASS: login and reading fallback regressions; no real network or credentials')
